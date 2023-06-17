@@ -4,7 +4,7 @@
 
 Чтобы сжать изображение необходимо указать следующие параметры, пример:
 
-###### python src/inference.py -poi dataset/inference_images/baboon.png  -mp Weights/pretrained_for_inference_weights/Mobilenet -b 4 
+##### python src/inference.py -poi dataset/inference_images/baboon.png  -mp Weights/pretrained_for_inference_weights/Mobilenet -b 4 
 
 -poi - параметр --path_one_image - путь к изображению, которое вы хотите сжать
 -mp - параметр model_path - путь к весам модели, которая должна содержать папки Encoder, Decoder с весами. Веса модели Mobilenet лежат в репозитории, Uresnet можно подргузить по ссылке - ...
