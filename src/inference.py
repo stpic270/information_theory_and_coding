@@ -98,7 +98,7 @@ if __name__ == "__main__":
 
                     # Get sizes
                     compressed_sz = os.path.getsize(save_path) * 8
-                    print('Filename - ', f, 'Size - ', compressed_sz, 'B - ', B)
+                    print('Filename - ', f, ', Size - ', compressed_sz, 'бит, параметр B - ', B)
                     # Get pixels product
                     compressed_shape_multiple = compressed_im.shape[0] * compressed_im.shape[1]
                     # Get bpp

@@ -1,0 +1,7 @@
+torch~=2.0.1
+torchvision~=0.15.2
+lpips~=0.1.4
+numpy~=1.24.2
+matplotlib~=3.7.0
+opencv-python~=4.7.0.72
+Pillow~=9.4.0
