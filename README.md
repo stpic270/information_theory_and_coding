@@ -58,6 +58,16 @@
 
 ![image](https://github.com/stpic270/information_theory_and_coding/assets/58371161/85077b54-bcad-4337-aaa1-12f71271d0f6)
 
+# Citation
+
+@InProceedings{Howard_2019_ICCV,
+author = {Howard, Andrew and Sandler, Mark and Chu, Grace and Chen, Liang-Chieh and Chen, Bo and Tan, Mingxing and Wang, Weijun and Zhu, Yukun and Pang, Ruoming and Vasudevan, Vijay and Le, Quoc V. and Adam, Hartwig},
+title = {Searching for MobileNetV3},
+booktitle = {The IEEE International Conference on Computer Vision (ICCV)},
+month = {October},
+year = {2019}
+}
+
 
 
 
