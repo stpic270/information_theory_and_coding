@@ -16,7 +16,7 @@
 
 Чтобы расжать изображение необходимо запустить:
 
-### python src/inference.py -poi dataset/inference_images/baboon.png  -mp Weights/pretrained_for_inference_weights/Mobilenet -b 4 -oe False
+#### python src/inference.py -poi dataset/inference_images/baboon.png  -mp Weights/pretrained_for_inference_weights/Mobilenet -b 4 -oe False
 
 -oe - параметр --only_encode сигнализирует расжать или сжать изображение 
 
@@ -26,7 +26,7 @@
 
 Можно также построить графики для сравнения результатов сжатия между jpeg и моделями. Пример запуска:
 
-### python src/inference.py -ibg Weights/pretrained_for_inference_weights/Mobilenet
+#### python src/inference.py -ibg Weights/pretrained_for_inference_weights/Mobilenet
 
 -ibg параметр --is_build_graph - путь к весам, такой же как и при сжатии.расжатии одного изображения
 
@@ -40,7 +40,7 @@
 
 Пример запуска тренировки модели:
 
-### python src/train.py -m Uresnet --B 2 -wp Weights/Uresnet -see 8 -e 10 -pe 5 
+#### python src/train.py -m Uresnet --B 2 -wp Weights/Uresnet -see 8 -e 10 -pe 5 
 
 -m - параметр --model - необходимо выбрать модель. Варианты [Uresnet, Mobilenet, VGG]
 --B - степень квантования во время обучения
