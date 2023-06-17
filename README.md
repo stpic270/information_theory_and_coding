@@ -60,7 +60,7 @@
 
 # Citation
 
-## Mobilenet:
+## Mobilenet autoencoder:
 
 @InProceedings{Howard_2019_ICCV,
 
