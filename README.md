@@ -6,8 +6,10 @@
 
 #### python src/inference.py -poi dataset/inference_images/baboon.png  -mp Weights/pretrained_for_inference_weights/Mobilenet -b 4 
 
--poi - параметр --path_one_image - путь к изображению, которое вы хотите сжать
+##### -poi - параметр --path_one_image - путь к изображению, которое вы хотите сжать
+
 -mp - параметр model_path - путь к весам модели, которая должна содержать папки Encoder, Decoder с весами. Веса модели Mobilenet лежат в репозитории, Uresnet можно подргузить по ссылке - ...
+
 -b параметр --B - степень сжатия, данный параметр должен соответствовать весу моделей, на котором его тренировали. Например, в папке Weights/pretrained_for_inference_weights/Mobilenet лежат следующие веса: 
 
 ![image](https://github.com/stpic270/information_theory_and_coding/assets/58371161/b58e72b4-c74e-4a8c-8b83-a096bc15a27f)
@@ -43,7 +45,9 @@
 #### python src/train.py -m Uresnet --B 2 -wp Weights/Uresnet -see 8 -e 10 -pe 5 
 
 -m - параметр --model - необходимо выбрать модель. Варианты [Uresnet, Mobilenet, VGG]
+
 --B - степень квантования во время обучения
+
 -wp - параметр --weights_path - путь где будут сохранены веса автоенкодера. Пример сохраненных весов модели в папке Weights:
 
 ![image](https://github.com/stpic270/information_theory_and_coding/assets/58371161/aa90ea1e-f622-4718-b7f1-45aa289ddbff)
