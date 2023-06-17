@@ -80,7 +80,9 @@ year = {2019}
 
 https://www.kaggle.com/code/ateplyuk/pytorch-starter-u-net-resnet
 
+## VGG autoencoder
 
+https://github.com/anderzzz/monkey_caput
 
 
 
