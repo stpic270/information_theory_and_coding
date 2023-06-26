@@ -1,4 +1,5 @@
 Weights/pretrained_for_inference_weights/Uresnet/
 Weights/pretrained_for_inference_weights/VGG/
+Weights/pretrained_for_inference_weights/Mobilenet/
 src/__pycache__
 

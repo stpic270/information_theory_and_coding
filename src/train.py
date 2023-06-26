@@ -3,7 +3,7 @@ from torch import nn
 import random
 import os
 
-from model import Uresnet18, encoder, decoder, VGGencoder, VGGdecoder, VGGauthoencoder, mobilenetv3_small, decoder_Mobilenet, Mobilenet_authoencoder
+from model import Uresnet18, encoder, decoder, VGGencoder, VGGdecoder, VGGauthoencoder, mobilenetv3_small, decoder_Mobilenet, Mobilenet_authoencoder, feature_extractor_1x1
 from utils import create_dataloaders, convert_tensor_to_image
 
 import argparse
@@ -15,14 +15,15 @@ from datetime import datetime
 parser = argparse.ArgumentParser(description="Predictor")
 parser.add_argument("-b", "--B", type=int, help="Specify B number ", required=True, default=2)
 parser.add_argument("-m", "--model", type=str, help="Choose model from Mobilenet, Uresnet, VGG", required=True, default='VGG')
+parser.add_argument("-c", "--coef", type=int, help="Choose multiplier for decoder in mobilenet", required=False, default=1)
 parser.add_argument("-wp", "--weights_path", type=str, help="Specify weights path", required=True, default=None)
 parser.add_argument("-r", "--is_random", type=bool, help="Specify if B is constant or random",
                     required=False, default=True)
 parser.add_argument("-dp", "--dataset_path", type=str, help="Specify dataset directory",
                     required=False, default='dataset')
 parser.add_argument("-e", "--epochs", type=int, help="Choose epochs numbers", required=False, default=3)
-parser.add_argument("-al", "--alpha", type=float, help="Choose alpha for customloss", required=False, default=0.9)
-parser.add_argument("-bl", "--beta", type=float, help="Choose beta for customloss", required=False, default=0.1)
+parser.add_argument("-al", "--alpha", type=float, help="Choose alpha for customloss", required=False, default=0.1)
+parser.add_argument("-bl", "--beta", type=float, help="Choose beta for customloss", required=False, default=0.9)
 parser.add_argument("-lr", "--learning_rate", type=float, help="Choose learning_rate", required=False, default=0.005)
 parser.add_argument("-mm", "--momentum", type=float, help="Choose momentum", required=False, default=0.9)
 parser.add_argument("-bs", "--batch_size", type=int, help="Choose batch_size", required=False, default=1)
@@ -58,7 +59,7 @@ class CustomLoss(nn.Module):
         return loss + d
 
 
-def train_EPOCHS(EPOCHS, What_B, dataloaders, save_path):
+def train_EPOCHS(EPOCHS, What_B, dataloaders, save_path, feat_extract=None):
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     writer = SummaryWriter('runs/compressing_trainer_{}'.format(timestamp))
     for epoch in range(EPOCHS):
@@ -67,7 +68,7 @@ def train_EPOCHS(EPOCHS, What_B, dataloaders, save_path):
 
         # Make sure gradient tracking is on, and do a pass over the data
         autoencoder.train(True)
-        avg_loss = train_one_epoch(epoch, writer, What_B, dataloaders)
+        avg_loss = train_one_epoch(epoch, writer, What_B, dataloaders, feat_extract=feat_extract)
 
         running_vloss = 0.0
         # Set the model to evaluation mode, disabling dropout and using population
@@ -90,7 +91,7 @@ def train_EPOCHS(EPOCHS, What_B, dataloaders, save_path):
 
                 inputs, labels = inputs.to(device), labels.to(device)
 
-                voutputs = autoencoder(inputs, B)
+                voutputs = autoencoder(inputs, B, feat_extract=feat_extract)
                 if epoch % args.plot_every == 0:
                     convert_tensor_to_image(voutputs.to('cpu'), B=B, epoch=epoch, model=args.model)
                 vloss = loss_fn(voutputs, inputs)
@@ -115,6 +116,13 @@ def train_EPOCHS(EPOCHS, What_B, dataloaders, save_path):
                 dec_save_path = f'{save_path}/Decoder/B_{B}_epochs_{epoch + 1}.pt'
                 aut_save_path = f'{save_path}/Autoencoder/B_{B}_epochs_{epoch + 1}.pt'
 
+                if feat_extract != None:
+                    feat_extract_folder_path = f'{save_path}/feature_extraction'
+                    if not os.path.exists(feat_extract_folder_path):
+                        os.mkdir(feat_extract_folder_path)
+                    feat_extract_save_path = os.path.join(feat_extract_folder_path, f'B_{B}_epochs_{epoch + 1}.pt')
+                    torch.save(feat_extract, feat_extract_save_path)
+
             else:
                 enc_save_path = f'{save_path}/Encoder/B_random_epochs_{epoch + 1}.pt'
                 dec_save_path = f'{save_path}/Decoder/B_random_epochs_{epoch + 1}.pt'
@@ -126,7 +134,7 @@ def train_EPOCHS(EPOCHS, What_B, dataloaders, save_path):
 
     return writer
 
-def train_one_epoch(epoch_index, tb_writer, What_B, dataloaders):
+def train_one_epoch(epoch_index, tb_writer, What_B, dataloaders, feat_extract=None):
     running_loss = 0.
 
     # Here, we use enumerate(training_loader) instead of
@@ -146,9 +154,11 @@ def train_one_epoch(epoch_index, tb_writer, What_B, dataloaders):
         inputs, labels = inputs.to(device), labels.to(device)
         # Zero your gradients for every batch!
         optimizer.zero_grad()
-
         # Make predictions for this batch
-        outputs = autoencoder(inputs, B)
+        if feat_extract != None:
+            outputs = autoencoder(inputs, B, feat_extract)
+        else:
+            outputs = autoencoder(inputs, B)
         # Compute the loss and its gradients
         loss = loss_fn(outputs, inputs)
         loss.backward()
@@ -167,35 +177,47 @@ def train_one_epoch(epoch_index, tb_writer, What_B, dataloaders):
 
     return last_loss
 
-def initialize_models(model, device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'), inference_path=None, epoch_B=None):
+def initialize_models(model, device=torch.device('cuda' if torch.cuda.is_available() else 'cpu'), inference_path=None, epoch_B=None, coef=1):
     if model == 'Uresnet':
         enc = encoder().to(device)
         dec = decoder().to(device)
         autoencoder = Uresnet18(enc, dec).to(device)
+        feat_extract = None
 
     elif model == 'VGG':
         enc = VGGencoder().to(device)
         dec = VGGdecoder(enc.encoder).to(device)
         autoencoder = VGGauthoencoder(enc, dec).to(device)
+        feat_extract = None
 
     elif model == 'Mobilenet':
+        feat_extract = feature_extractor_1x1()
+        feat_extract = feat_extract.to(device)
         enc = mobilenetv3_small()
-        enc.load_state_dict(torch.load('Weights/mobilenet_v3_small-047dcff4.pth'))
+        if inference_path == None:
+            enc.load_state_dict(torch.load('Weights/mobilenet_v3_small-047dcff4.pth'))
         enc = enc.to(device)
-        dec = decoder_Mobilenet().to(device)
+        dec = decoder_Mobilenet(coef=coef).to(device)
         autoencoder = Mobilenet_authoencoder(enc, dec).to(device)
 
     if inference_path != None:
 
         enc_path = os.path.join(inference_path, 'Encoder', epoch_B)
         dec_path = os.path.join(inference_path, 'Decoder', epoch_B)
+        feature_extract_path = os.path.join(inference_path, 'feature_extraction', epoch_B)
+
+        if os.path.exists(feature_extract_path):
+            feat_extract = torch.load(feature_extract_path, map_location=device)
+            feat_extract = feat_extract.to(device)
+        else:
+            feat_extract = None
 
         enc = torch.load(enc_path, map_location=device)
         dec = torch.load(dec_path, map_location=device)
 
-        return enc, dec
+        return enc, dec, feat_extract
 
-    return enc, dec, autoencoder
+    return enc, dec, autoencoder, feat_extract
 
 if __name__ == "__main__":
 
@@ -210,8 +232,13 @@ if __name__ == "__main__":
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     dataloaders = create_dataloaders(args.dataset_path, batch_size=args.batch_size)
-    enc, dec, autoencoder = initialize_models(model=model)
-    optimizer = torch.optim.SGD(autoencoder.parameters(), lr=args.learning_rate, momentum=args.momentum)
-    loss_fn = CustomLoss(alpha=args.alpha, beta=args.beta)
+    enc, dec, autoencoder, feat_extract = initialize_models(model=model, coef=args.coef)
 
-    train_EPOCHS(EPOCHS=epochs, What_B=What_B, dataloaders=dataloaders, save_path=weights_path)
+    if feat_extract != None:
+        params = list(autoencoder.parameters()) + list(feat_extract.parameters())
+        optimizer = torch.optim.Adam(params, lr=0.000075, betas=[0.9, 0.999])
+    else:
+        optimizer = torch.optim.Adam(autoencoder.parameters(), lr=args.learning_rate, betas=[0.9, 0.999])
+
+    loss_fn = CustomLoss(alpha=args.alpha, beta=args.beta)
+    train_EPOCHS(EPOCHS=epochs, What_B=What_B, dataloaders=dataloaders, save_path=weights_path, feat_extract=feat_extract)

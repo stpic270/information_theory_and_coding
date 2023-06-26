@@ -36,7 +36,7 @@ class encoder(nn.Module):
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, input, B, Compression=False, train=True,
-                save_path=None):
+                save_path=None, feat_extract=None):
 
         x_original = self.conv_original_size0(input)
         x_original = self.conv_original_size1(x_original)
@@ -157,7 +157,7 @@ class Uresnet18(torch.nn.Module):
         self.encoder = encoder
         self.decoder = decoder
 
-    def forward(self, x, B, Compression=False, train=True, save_path=None):
+    def forward(self, x, B, Compression=False, train=True, save_path=None, feat_extract=None):
         outputs = self.encoder(x, B, Compression=Compression,
                                train=train, save_path=save_path)
 
@@ -190,7 +190,7 @@ class VGGencoder(nn.Module):
 
         self.encoder = self._encodify_(vgg)
 
-    def forward(self, x, B, Compression=False, train=True, save_path=None):
+    def forward(self, x, B, Compression=False, train=True, save_path=None, feat_extract=None):
         '''Execute the encoder on the image input
 
         Args:
@@ -397,7 +397,7 @@ class VGGauthoencoder(torch.nn.Module):
         self.encoder = encoder
         self.decoder = decoder
 
-    def forward(self, x, B, Compression=False,train=True, save_path=None):
+    def forward(self, x, B, Compression=False,train=True, save_path=None, feat_extract=None):
         x = self.encoder(x, B, Compression=Compression, train=train, save_path=save_path)
         if Compression:
           x = self.decoder.decompressed(save_path=save_path)
@@ -624,24 +624,32 @@ class MobileNetV3(nn.Module):
                 m.weight.data.normal_(0, 0.01)
                 m.bias.data.zero_()
 
-    def forward(self, x, B, Compression=False, train=True, save_path=None):
+    def forward(self, x, B, feat_extract, Compression=False, train=True, save_path=None):
         outputs = []
         shapes = []
         for i, l in enumerate(self.features):
             x = l(x)
+            x_tolist = feat_extract.convs_1x1[i](x)
 
-            if (i ==2 or i ==4 or i == 9):
-                x = self.sigmoid(x)
-                outputs.append(x)
-                shapes.append((x.shape, int(torch.flatten(x).shape[0])))
+            if train:
+              x_tolist = x_tolist + 1/(2**B) * random.uniform(-0.5, 0.5)
+
+            outputs.append(x_tolist)
+            shapes.append((x_tolist.shape, int(torch.flatten(x_tolist).shape[0])))
 
         x = self.conv(x)
         x = self.avgpool(x)
-        outputs.append(x)
-        shapes.append((x.shape, int(torch.flatten(x).shape[0])))
 
         if train:
-          x = x + 1/2**B * random.uniform(-0.5, 0.5)
+          x = x + 1/(2**B) * random.uniform(-0.5, 0.5)
+          outputs.append(x)
+          shapes.append((x.shape, int(torch.flatten(x).shape[0])))
+
+        else:
+          outputs.append(x)
+          shapes.append((x.shape, int(torch.flatten(x).shape[0])))
+          #  pass
+        # Compression if true
         if Compression:
           batch_size = x.shape[0]
 
@@ -657,6 +665,7 @@ class MobileNetV3(nn.Module):
 
           for_compress = torch.flatten(outs)
           for_compress = for_compress.tolist()
+          # print(len(for_compress))
           frequency = collections.Counter(for_compress)
 
           for k in frequency.keys():
@@ -669,6 +678,8 @@ class MobileNetV3(nn.Module):
           if save_path != None:
             length = len(for_compress)
             torch_compressed = torch.tensor(compressed, dtype=torch.int8)
+            # print(torch_compressed.shape)
+            #list_to_save = [torch_compressed, pool_indices, model, coder, batch_size, length, B]
             list_to_save = [torch_compressed, coder, batch_size, length, B, shapes]
 
             with open(save_path, "wb") as fp:   #Pickling
@@ -677,90 +688,145 @@ class MobileNetV3(nn.Module):
         return outputs
 
 class decoder_Mobilenet(nn.Module):
-    def __init__(self):
+    def __init__(self, coef=1):
         super().__init__()
 
-        self.layer2_1x1 = convrelu_mobilenet(24, 24, 1, 0)
-        self.layer4_1x1 = convrelu_mobilenet(40, 40, 1, 0)
-        self.layer9_1x1 = convrelu_mobilenet(96, 96, 1, 0)
-        self.out_1x1 = convrelu_mobilenet(576, 96, 1, 0)
+
+        self.layer1_1x1 = convrelu(1, 16*coef, 1, 0)
+        self.layer2_1x1 = convrelu(2, 16*coef, 1, 0)
+        self.layer3_1x1 = convrelu(2, 24*coef, 1, 0)
+        self.layer4_1x1 = convrelu(2, 24*coef, 1, 0)
+        self.layer5_1x1 = convrelu(3, 40*coef, 1, 0)
+        self.layer6_1x1 = convrelu(3, 40*coef, 1, 0)
+        self.layer7_1x1 = convrelu(3, 40*coef, 1, 0)
+        self.layer8_1x1 = convrelu(3, 48*coef, 1, 0)
+        self.layer9_1x1 = convrelu(3, 48*coef, 1, 0)
+        self.layer10_1x1 = convrelu(4, 96*coef, 1, 0)
+        self.layer11_1x1 = convrelu(4, 96*coef, 1, 0)
+        self.layer12_1x1 = convrelu(4, 96*coef, 1, 0)
+        self.out_1x1 = convrelu(576, 96*coef, 1, 0)
 
         self.upsample7 = nn.Upsample(scale_factor=7, mode='nearest')
         self.upsample2 = nn.Upsample(scale_factor=2, mode='nearest')
 
 
-        self.conv_up4 = convrelu_mobilenet(96 + 96, 48, 3, 1)
-        self.conv_up3 = convrelu_mobilenet(48, 40, 3, 1)
-        self.conv_up2 = convrelu_mobilenet(40 + 40, 24, 3, 1)
-        self.conv_up1 = convrelu_mobilenet(24 + 24, 16, 3, 1)
-        self.conv_up0 = convrelu_mobilenet(16, 3, 3, 1)
+        self.conv_up1 = convrelu(96*coef + 96*coef, 48*coef, 3, 1)
+        self.conv_up2 = convrelu(48*coef + 48*coef, 40*coef, 3, 1)
+        self.conv_up3 = convrelu(40*coef + 40*coef, 24*coef, 3, 1)
+        self.conv_up4 = convrelu(24*coef + 24*coef, 16*coef, 3, 1)
+        self.conv_up5 = convrelu(16*coef + 16*coef, 16*coef, 3, 1)
+        self.conv_up6 = convrelu(16*coef + 16*coef, 16*coef, 3, 1)
 
+        self.conv_96_1 = convrelu(96*coef + 96*coef, 96*coef, 3, 1)
+        self.conv_96_2 = convrelu(96*coef + 96*coef, 96*coef, 3, 1)
+        self.conv_48 = convrelu(48*coef + 48*coef, 48*coef, 3, 1)
+        self.conv_40_1 = convrelu(40*coef + 40*coef, 40*coef, 3, 1)
+        self.conv_40_2 = convrelu(40*coef + 40*coef, 40*coef, 3, 1)
+        self.conv_24 = convrelu(24*coef+24*coef, 24*coef, 3, 1)
 
-        self.conv_96 = nn.Sequential(convrelu_mobilenet(96, 96, 3, 1), convrelu_mobilenet(96, 96, 3, 1))
-        self.conv_48 = convrelu_mobilenet(48, 48, 3, 1)
-        self.conv_40 = nn.Sequential(convrelu_mobilenet(40, 40, 3, 1), convrelu_mobilenet(40, 40, 3, 1))
-        self.conv_24 = convrelu_mobilenet(24, 24, 3, 1)
-        self.conv_16 = nn.Sequential(convrelu_mobilenet(16, 16, 3, 1), nn.Upsample(scale_factor=2, mode='nearest'), convrelu_mobilenet(16, 16, 3, 1))
+        self.before_last = convrelu(16*coef, 3*coef, 3, 1)
 
-        self.conv_last = nn.Conv2d(3, 3, 1)
+        self.conv_last = nn.Conv2d(3*coef, 3, 1)
 
     def decompressed(self, save_path=None):
 
         if save_path != None:
-            with open(save_path, 'rb') as pf:
-                list_to_save = pickle.load(pf)
-            pf.close()
+          with open(save_path, 'rb') as pf:
+            list_to_save = pickle.load(pf)
+          pf.close()
 
         torch_compressed, coder, batch_size, length, B, shapes = list_to_save
         torch_compressed_list = torch_compressed.tolist()
         decompressed_list = coder.decompress(torch_compressed_list, length_encoded=length)
         decompressed_tensor = torch.FloatTensor(decompressed_list).to(device)
-        decompressed_tensor = decompressed_tensor / 2 ** B
+        decompressed_tensor = decompressed_tensor / 2**B
 
         old_index = 0
         outputs = []
         for sh in shapes:
-            shape, dot = sh
-            new_index = dot + old_index
+          shape, dot = sh
+          new_index = dot + old_index
 
-            x = decompressed_tensor[old_index:new_index]
-            x = torch.reshape(x, shape)
-            outputs.append(x)
+          x = decompressed_tensor[old_index:new_index]
+          x = torch.reshape(x, shape)
+          outputs.append(x)
 
-            old_index = new_index
+          old_index = new_index
 
         return outputs
 
     def forward(self, outputs):
 
-        layer2, layer4, layer9, x  = outputs
+        layer1, layer2, layer3, layer4, layer5, layer6, layer7, layer8, layer9, layer10, layer11, layer12, x  = outputs
 
+        # Out preprocessing
         x = self.upsample7(x)
         x = self.out_1x1(x)
 
+        # 96 channels preprocess
+        layer12 = self.layer12_1x1(layer12)
+        x = torch.cat([x, layer12], dim=1)
+        x = self.conv_96_1(x)
+
+        layer11 = self.layer11_1x1(layer11)
+        x = torch.cat([x, layer11], dim=1)
+        x = self.conv_96_2(x)
+
+        # 1 Conv up and upsample2
+        layer10 = self.layer10_1x1(layer10)
+        x = torch.cat([x, layer10], dim=1)
+        x = self.conv_up1(x)
+        x = self.upsample2(x)
+
+        # 48 channels preprocess
         layer9 = self.layer9_1x1(layer9)
         x = torch.cat([x, layer9], dim=1)
-        x = self.conv_up4(x)
-
-        x = self.upsample2(x)
         x = self.conv_48(x)
-        x = self.conv_up3(x)
 
-        layer4 = self.layer4_1x1(layer4)
-        x = torch.cat([x, layer4], dim=1)
+        # 2 Conv up without upsample2 (resolution: 14x14)
+        layer8 = self.layer8_1x1(layer8)
+        x = torch.cat([x, layer8], dim=1)
         x = self.conv_up2(x)
 
+        # 40 channels preprocess
+        layer7 = self.layer7_1x1(layer7)
+        x = torch.cat([x, layer7], dim=1)
+        x = self.conv_40_1(x)
+
+        layer6 = self.layer6_1x1(layer6)
+        x = torch.cat([x, layer6], dim=1)
+        x = self.conv_40_2(x)
+
+        # 3 Conv up and upsample2
+        layer5 = self.layer5_1x1(layer5)
+        x = torch.cat([x, layer5], dim=1)
+        x = self.conv_up3(x)
         x = self.upsample2(x)
+
+        # 24 channels preprocess
+        layer4 = self.layer4_1x1(layer4)
+        x = torch.cat([x, layer4], dim=1)
         x = self.conv_24(x)
+
+        # 4 Conv up and upsample2
+        layer3 = self.layer3_1x1(layer3)
+        x = torch.cat([x, layer3], dim=1)
+        x = self.conv_up4(x)
+        x = self.upsample2(x)
+
+        # 5 Conv up and upsample2
         layer2 = self.layer2_1x1(layer2)
         x = torch.cat([x, layer2], dim=1)
-        x = self.conv_up1(x)
-
+        x = self.conv_up5(x)
         x = self.upsample2(x)
-        x = self.conv_16(x)
 
+        # 6 Conv up and upsample2
+        layer1 = self.layer1_1x1(layer1)
+        x = torch.cat([x, layer1], dim=1)
+        x = self.conv_up6(x)
         x = self.upsample2(x)
-        x = self.conv_up0(x)
+
+        x = self.before_last(x)
 
         out = self.conv_last(x)
 
@@ -772,8 +838,8 @@ class Mobilenet_authoencoder(torch.nn.Module):
         self.encoder = encoder
         self.decoder = decoder
 
-    def forward(self, x, B, Compression=False,train=True, save_path=None):
-        outputs = self.encoder(x, B, Compression=Compression, train=train, save_path=save_path)
+    def forward(self, x, B, feat_extract, Compression=False,train=True, save_path=None):
+        outputs = self.encoder(x, B, feat_extract, Compression=Compression, train=train, save_path=save_path)
 
         if Compression:
           outputs = self.decoder.decompressed(save_path=save_path)
@@ -781,3 +847,26 @@ class Mobilenet_authoencoder(torch.nn.Module):
         out = self.decoder(outputs)
 
         return out
+
+class feature_extractor_1x1(nn.Module):
+    def __init__(self):
+        super(feature_extractor_1x1, self).__init__()
+
+        # Encoder layers
+        self.conv1x1_1 =  conv_1x1_bn(16, 1)
+        self.conv1x1_2 =  conv_1x1_bn(16, 2)
+        self.conv1x1_3 =  conv_1x1_bn(24, 2)
+        self.conv1x1_4 =  conv_1x1_bn(24, 2)
+        self.conv1x1_5 =  conv_1x1_bn(40, 3)
+        self.conv1x1_6 =  conv_1x1_bn(40, 3)
+        self.conv1x1_7 =  conv_1x1_bn(40, 3)
+        self.conv1x1_8 =  conv_1x1_bn(48, 3)
+        self.conv1x1_9 =  conv_1x1_bn(48, 3)
+        self.conv1x1_10 =  conv_1x1_bn(96, 4)
+        self.conv1x1_11 =  conv_1x1_bn(96, 4)
+        self.conv1x1_12 =  conv_1x1_bn(96, 4)
+
+        self.convs_1x1 = [self.conv1x1_1, self.conv1x1_2, self.conv1x1_3,
+                     self.conv1x1_4, self.conv1x1_5, self.conv1x1_6,
+                     self.conv1x1_7, self.conv1x1_8, self.conv1x1_9,
+                     self.conv1x1_10, self.conv1x1_11, self.conv1x1_12]

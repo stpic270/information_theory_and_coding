@@ -12,7 +12,7 @@ from utils import convert_one_tensor_to_one_image, PSNR, compress_images_with_jp
 import matplotlib.pyplot as plt
 
 from train import initialize_models
-from model import encoder, decoder, MobileNetV3, h_swish, h_sigmoid, InvertedResidual, SELayer, decoder_Mobilenet
+from model import encoder, decoder, MobileNetV3, h_swish, h_sigmoid, InvertedResidual, SELayer, decoder_Mobilenet, feature_extractor_1x1
 
 valid_transform = transforms.Compose([transforms.Resize((224,224)), transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
@@ -33,9 +33,6 @@ parser.add_argument("-poi", "--path_one_image", type=str, help="Compress-decompr
                     required=False, default='dataset/inference_images/miles_morales.png')
 parser.add_argument("-oe", "--only_encode", type=str, help="Only encode means save compressed variant",
                     required=False, default='True')
-
-
-
 
 if __name__ == "__main__":
 
@@ -60,6 +57,8 @@ if __name__ == "__main__":
                 main_dict['autoencoder_' + str(f) + '_compressed_images'] = []
 
                 f_s = f'dataset/inference_images/autoencoder_compressed/{model}'
+                if not os.path.exists('dataset/inference_images/autoencoder_compressed'):
+                    os.mkdir('dataset/inference_images/autoencoder_compressed')
                 if not os.path.exists(f_s):
                     os.mkdir(f_s)
 
@@ -77,17 +76,14 @@ if __name__ == "__main__":
                         os.mkdir(folder_path)
                     save_path = f'{folder_path}/{B}.bin'
 
-                    enc, dec = initialize_models(model=model, inference_path=is_build_graph,epoch_B=epoch_B)
+                    enc, dec, feat_extract = initialize_models(model=model, inference_path=is_build_graph,epoch_B=epoch_B)
                     # print(enc_path)
 
                     input_image = Image.open(f_path)
                     input_tensor = valid_transform(input_image)
                     input_im = input_tensor.unsqueeze(0).to(device)
 
-                    outputs = enc(input_im, B, Compression=True, train=False, save_path=save_path)
-                    # if model == 'Uresnet':
-                    #     outs = dec.decompressed(outputs, B=B, save_path=save_path)
-                    # else:
+                    outputs = enc(input_im, B, Compression=True, train=False, save_path=save_path, feat_extract=feat_extract)
                     outs = dec.decompressed(save_path=save_path)
                     x = dec(outs)
 
@@ -124,11 +120,15 @@ if __name__ == "__main__":
         plt.title('BPP/PSNR result')
         leg = plt.legend(loc='lower right')
         if model == 'Uresnet':
-            plt.xlim(2790, 2820)
-            print(main_dict['autoencoder_' + str(f) + '_bpp'])
+            plt.xlim(2790, 2815)
+            plt.ylim(0, 45)
+        elif model=='Mobilenet':
+            plt.xlim(0, 40)
+            plt.ylim(27, 29)
         else:
-            plt.xlim(0, 30)
-        plt.ylim(0, 45)
+            plt.xlim(0, 40)
+            plt.ylim(0, 45)
+
         # function to show the plot
         plt.show()
 
@@ -142,7 +142,7 @@ if __name__ == "__main__":
         for pt in os.listdir(f'{model_path}/Encoder'):
             if str(B) in pt:
                 epoch_B = pt
-        enc, dec = initialize_models(model=model, inference_path=model_path, epoch_B=epoch_B)
+        enc, dec, feat_extract = initialize_models(model=model, inference_path=model_path, epoch_B=epoch_B)
 
         input_image = Image.open(path_image)
         input_tensor = valid_transform(input_image)
@@ -150,6 +150,8 @@ if __name__ == "__main__":
 
         path_folder = f'dataset/inference_images/save_compressed_images/{model}'
 
+        if not os.path.exists('dataset/inference_images/save_compressed_images'):
+            os.mkdir('dataset/inference_images/save_compressed_images')
         if not os.path.exists(path_folder):
             os.mkdir(path_folder)
 
@@ -157,7 +159,7 @@ if __name__ == "__main__":
 
         if only_encode=='True':
 
-            outputs = enc(input_im, B=B, Compression=True, train=False, save_path=save_path)
+            outputs = enc(input_im, B=B, Compression=True, train=False, save_path=save_path, feat_extract=feat_extract)
             sys.exit(f'Image is encoded at path {save_path}')
 
         else:
@@ -165,7 +167,8 @@ if __name__ == "__main__":
             outs = dec.decompressed(save_path=save_path)
             x = dec(outs)
 
-            save_decode = f'{path_folder}/decoded_my_image_B_{B}.png'
+            save_decode = f'{path_folder}/decoded_my_image_B_{B}.jpeg'
+            print(x.shape)
             img = convert_one_tensor_to_one_image(x[0].to('cpu'))
             img.save(save_decode)
             print(f'Image is decoded at path {save_decode}')

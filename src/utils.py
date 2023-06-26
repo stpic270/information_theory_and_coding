@@ -92,6 +92,8 @@ def convert_tensor_to_image(t, B=2, show_noise=True, epoch=None, model=None):
         z = z + torch.tensor(mean).view(3, 1, 1)
         img2 = transforms.ToPILImage(mode='RGB')(z)
         if epoch != None:
+            if not os.path.exists('dataset/images_during_training'):
+                os.mkdir('dataset/images_during_training')
             model_path = f'dataset/images_during_training/{model}'
             epoch_path = f'dataset/images_during_training/{model}/epoch_{epoch}'
 
@@ -145,6 +147,8 @@ def compress_images_with_jpg():
             folder_name = f.split('.')[0]
             folder_path = os.path.join(s_p, folder_name)
 
+            if not os.path.exists('dataset/inference_images/jpg_compress'):
+                os.mkdir('dataset/inference_images/jpg_compress')
             if not os.path.exists(folder_path):
                 os.mkdir(folder_path)
             for quality in range(50, 101, 5):
