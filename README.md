@@ -8,7 +8,7 @@
 
 ##### -poi - параметр --path_one_image - путь к изображению, которое вы хотите сжать
 
-##### -mp - параметр model_path - путь к весам модели, которая должна содержать папки Encoder, Decoder с весами. Веса модели Mobilenet лежат в репозитории, Uresnet можно подргузить по ссылке - https://drive.google.com/file/d/1Y5E9c1ahfSKhpDjWh2rZaDZ946F7bzL2/view?usp=sharing
+##### -mp - параметр model_path - путь к весам модели, которая должна содержать папки Encoder, Decoder с весами. Веса моделей можно подргузить по ссылке - https://drive.google.com/drive/folders/1OsQcX1fyGqmEqwBq2fKg06nvpnJ4oWAs?usp=sharing
 
 ##### -b параметр --B - степень сжатия, данный параметр должен соответствовать весу моделей, на котором его тренировали. Например, в папке Weights/pretrained_for_inference_weights/Mobilenet лежат следующие веса: 
 
