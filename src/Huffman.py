@@ -117,28 +117,18 @@ def huffman(path):
             pos+=1
 
     print("Your UNCOMPRESSED data is:")
-    if h == 1:
-        temp = re.findall(r'\d+', uncompressed_string)
-        res = list(map(int, temp))
-        res = np.array(res)
-        res = res.astype(np.uint8)
-        res = np.reshape(res, shape)
-        print(res)
-        print("Observe the shapes and input and output arrays are matching or not")
-        print("Input image dimensions:",shape)
-        print("Output image dimensions:",res.shape)
-        data = Image.fromarray(res)
-        data.save('uncompressed.png')
-        if a.all() == res.all():
-            print("Success")
-    if h == 2:
-        temp = re.findall(r'\d+', uncompressed_string)
-        res = list(map(int, temp))
-        print(res)
-        res = np.array(res)
-        res = res.astype(np.uint8)
-        res = np.reshape(res, (1024, 720))
-        print(res)
-        data = Image.fromarray(res)
-        data.save('uncompressed.png')
+    
+    temp = re.findall(r'\d+', uncompressed_string)
+    res = list(map(int, temp))
+    res = np.array(res)
+    res = res.astype(np.uint8)
+    res = np.reshape(res, shape)
+    print(res)
+    print("Observe the shapes and input and output arrays are matching or not")
+    print("Input image dimensions:",shape)
+    print("Output image dimensions:",res.shape)
+    data = Image.fromarray(res)
+    data.save('uncompressed.png')
+    if a.all() == res.all():
         print("Success")
+    
