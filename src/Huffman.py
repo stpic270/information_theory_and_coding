@@ -6,7 +6,6 @@ print("Huffman Compression Program")
 def huffman(path):
 
     print("=================================================================")
-    print("AAAAAAAAAAAAAAA")
     file = path
     my_string = np.asarray(Image.open(file),np.uint8)
     shape = my_string.shape
